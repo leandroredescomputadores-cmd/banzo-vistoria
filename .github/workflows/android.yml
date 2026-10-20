@@ -8,21 +8,37 @@ on:
 jobs:
   build-debug-apk:
     runs-on: ubuntu-latest
+    env:
+      ANDROID_HOME: /usr/local/lib/android/sdk
+      ANDROID_SDK_ROOT: /usr/local/lib/android/sdk
     steps:
       - name: Baixar o código
         uses: actions/checkout@v4
 
       - name: Configurar Java
-        uses: actions/setup-java@v4
+        uses: actions/setup-java@v5
         with:
           distribution: temurin
           java-version: "17"
 
-      - name: Configurar Android SDK
-        uses: android-actions/setup-android@v3
+      # O runner do GitHub já inclui o Android SDK.
+      # Não usamos setup-android porque a etapa de licenças falhou.
+      - name: Verificar Android SDK instalado
+        run: |
+          echo "ANDROID_HOME=$ANDROID_HOME"
+          test -d "$ANDROID_HOME"
+          ls "$ANDROID_HOME"
+          which sdkmanager || true
 
-      - name: Instalar SDK Android
-        run: sdkmanager "platforms;android-35" "build-tools;35.0.0"
+      - name: Instalar licenças e componentes necessários
+        run: |
+          SDKMANAGER="$(find "$ANDROID_HOME/cmdline-tools" -path '*/bin/sdkmanager' -type f 2>/dev/null | sort -V | tail -n 1)"
+          if [ -z "$SDKMANAGER" ]; then
+            echo "Não foi possível localizar sdkmanager no Android SDK pré-instalado."
+            exit 1
+          fi
+          yes | "$SDKMANAGER" --licenses || true
+          "$SDKMANAGER" "platforms;android-35" "build-tools;35.0.0"
 
       - name: Instalar Gradle
         uses: gradle/actions/setup-gradle@v4
@@ -35,7 +51,8 @@ jobs:
       - name: Publicar APK para download
         uses: actions/upload-artifact@v4
         with:
-          name: FiscalAsfalto-debug-apk
+          name: Banzo-Vistoria-debug-apk
           path: app/build/outputs/apk/debug/app-debug.apk
           if-no-files-found: error
           retention-days: 14
+
