@@ -209,14 +209,47 @@ class MainActivity : ComponentActivity() {
         }
 
         val photoCapture = rememberLauncherForActivityResult(ActivityResultContracts.TakePicture()) { success ->
-            if (success && pendingPhotoPath.isNotBlank()) {
-                photos = (photos.split("\n").filter { it.isNotBlank() } + pendingPhotoPath).joinToString("\n")
-                Toast.makeText(context, "Foto adicionada à ocorrência", Toast.LENGTH_SHORT).show()
-            }
+            val capturedPath = pendingPhotoPath
             pendingPhotoPath = ""
+            if (success && capturedPath.isNotBlank() && File(capturedPath).exists() && File(capturedPath).length() > 0L) {
+                photos = (photos.split("\n").filter { it.isNotBlank() } + capturedPath).joinToString("\n")
+                Toast.makeText(context, "Foto adicionada à ocorrência", Toast.LENGTH_SHORT).show()
+            } else if (!success) {
+                capturedPath.takeIf { it.isNotBlank() }?.let { File(it).delete() }
+                Toast.makeText(context, "A captura foi cancelada ou não foi concluída. Tente novamente.", Toast.LENGTH_LONG).show()
+            } else {
+                Toast.makeText(context, "A câmera não salvou a fotografia. Tente novamente.", Toast.LENGTH_LONG).show()
+            }
+        }
+
+        fun launchPhotoCapture() {
+            try {
+                val dir = File(getExternalFilesDir("photos") ?: filesDir, "occurrences")
+                if (!dir.exists() && !dir.mkdirs()) {
+                    Toast.makeText(context, "Não foi possível preparar a pasta das fotografias.", Toast.LENGTH_LONG).show()
+                    return
+                }
+                val file = File(dir, "foto_${System.currentTimeMillis()}.jpg")
+                val uri = androidx.core.content.FileProvider.getUriForFile(this@MainActivity, "${packageName}.files", file)
+                pendingPhotoPath = file.absolutePath
+                photoCapture.launch(uri)
+            } catch (e: Exception) {
+                pendingPhotoPath = ""
+                Toast.makeText(context, "Não foi possível abrir a câmera: ${e.localizedMessage ?: "erro inesperado"}", Toast.LENGTH_LONG).show()
+            }
+        }
+
+        val cameraPermission = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { granted ->
+            if (granted) launchPhotoCapture()
+            else Toast.makeText(context, "Permissão da câmera negada. Para fotografar, permita o acesso à câmera nas configurações do Banzo Vistoria.", Toast.LENGTH_LONG).show()
         }
         LaunchedEffect(Unit) { db.occurrenceDao().observeAll().collectLatest { occurrences = it } }
-        Scaffold(topBar = { TopAppBar(title = { Text("BANZO VISTORIA") }) }) { padding ->
+        Scaffold(topBar = { TopAppBar(title = {
+            Column(verticalArrangement = Arrangement.spacedBy(0.dp)) {
+                Text("BANZO VISTORIA", style = MaterialTheme.typography.titleMedium)
+                Text("Fiscalização de recomposição asfáltica", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            }
+        }) }) { padding ->
             LazyColumn(Modifier.fillMaxSize().padding(padding).padding(16.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
                 item { Text("Nova ocorrência", style = MaterialTheme.typography.titleLarge) }
                 item { OutlinedTextField(inspector, { inspector = it }, label = { Text("Fiscal responsável") }, modifier = Modifier.fillMaxWidth()) }
@@ -278,12 +311,8 @@ class MainActivity : ComponentActivity() {
                         }
                     }
                     Button(onClick = {
-                        val dir = File(getExternalFilesDir("photos") ?: filesDir, "occurrences")
-                        dir.mkdirs()
-                        val file = File(dir, "foto_${System.currentTimeMillis()}.jpg")
-                        val uri: Uri = androidx.core.content.FileProvider.getUriForFile(this@MainActivity, "${packageName}.files", file)
-                        pendingPhotoPath = file.absolutePath
-                        photoCapture.launch(uri)
+                        val granted = ContextCompat.checkSelfPermission(this@MainActivity, Manifest.permission.CAMERA) == PackageManager.PERMISSION_GRANTED
+                        if (granted) launchPhotoCapture() else cameraPermission.launch(Manifest.permission.CAMERA)
                     }, modifier = Modifier.fillMaxWidth()) { Text("Fotografar local") }
                 }
                 item { OutlinedTextField(workOrder, { workOrder = it }, label = { Text("Número da ordem de serviço (se houver)") }, modifier = Modifier.fillMaxWidth()) }
@@ -316,10 +345,21 @@ class MainActivity : ComponentActivity() {
                         val items = db.occurrenceDao().forPeriod(start, cal.timeInMillis)
                         val file = PdfReport.createDaily(context, items)
                         val uri = androidx.core.content.FileProvider.getUriForFile(context, "${packageName}.files", file)
-                        val intent = Intent(Intent.ACTION_SEND).apply { type = "application/pdf"; putExtra(Intent.EXTRA_STREAM, uri); addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION) }
-                        startActivity(Intent.createChooser(intent, "Compartilhar relatório diário"))
+                        val intent = Intent(Intent.ACTION_SEND).apply {
+                            type = "application/pdf"
+                            putExtra(Intent.EXTRA_STREAM, uri)
+                            putExtra(Intent.EXTRA_SUBJECT, "Banzo Vistoria — Relatório diário de fiscalização")
+                            putExtra(Intent.EXTRA_TEXT, "Segue em anexo o relatório diário de fiscalização gerado pelo Banzo Vistoria.")
+                            clipData = android.content.ClipData.newUri(contentResolver, file.name, uri)
+                            addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+                        }
+                        try {
+                            startActivity(Intent.createChooser(intent, "Enviar relatório por e-mail ou compartilhar"))
+                        } catch (_: Exception) {
+                            Toast.makeText(context, "Não foi encontrado um aplicativo compatível para compartilhar o PDF.", Toast.LENGTH_LONG).show()
+                        }
                     }
-                }, modifier = Modifier.fillMaxWidth()) { Text("Gerar e compartilhar PDF diário") } }
+                }, modifier = Modifier.fillMaxWidth()) { Text("Gerar e enviar relatório por e-mail") } }
                 item { Text("Ocorrências registradas (${occurrences.size})", style = MaterialTheme.typography.titleLarge) }
                 items(occurrences, key = { it.id }) { item ->
                     Card(Modifier.fillMaxWidth()) { Column(Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {

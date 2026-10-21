@@ -22,8 +22,11 @@ object PdfReport {
         val titlePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply { textSize = 17f; isFakeBoldText = true }
         val headingPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply { textSize = 12f; isFakeBoldText = true }
         val dateText = SimpleDateFormat("dd/MM/yyyy", Locale("pt", "BR")).format(date)
-        val output = File(context.getExternalFilesDir(null) ?: context.filesDir, "Relatorio_Recomposicao_$dateText.pdf")
-        output.parentFile?.mkdirs()
+        // Nome seguro para arquivos e único a cada geração, inclusive vários relatórios no mesmo dia.
+        val fileTimestamp = SimpleDateFormat("yyyy-MM-dd_HH-mm-ss-SSS", Locale.US).format(date)
+        val outputDir = File(context.getExternalFilesDir(null) ?: context.filesDir, "relatorios")
+        outputDir.mkdirs()
+        val output = File(outputDir, "Banzo_Vistoria_Relatorio_Diario_$fileTimestamp.pdf")
         var pageNumber = 1
         var page = pdf.startPage(PdfDocument.PageInfo.Builder(pageWidth, pageHeight, pageNumber).create())
         var canvas = page.canvas
