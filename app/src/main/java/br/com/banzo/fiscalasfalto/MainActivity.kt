@@ -5,23 +5,32 @@ import android.content.Intent
 import android.content.pm.PackageManager
 import android.net.Uri
 import java.io.File
+import android.graphics.BitmapFactory
 import android.location.Location
-import android.location.LocationManager
+import android.location.Geocoder
 import android.os.Bundle
 import android.widget.Toast
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.compose.setContent
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.foundation.Image
+import androidx.compose.foundation.background
+import androidx.compose.foundation.border
+import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material3.Button
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Card
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -33,6 +42,8 @@ import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.*
+import androidx.compose.ui.graphics.asImageBitmap
+import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
@@ -49,8 +60,13 @@ import br.com.banzo.fiscalasfalto.data.OccurrenceStatus
 import br.com.banzo.fiscalasfalto.data.Pathologies
 import br.com.banzo.fiscalasfalto.sync.GraphSyncWorker
 import br.com.banzo.fiscalasfalto.util.PdfReport
+import com.google.android.gms.location.LocationServices
+import com.google.android.gms.location.Priority
+import com.google.android.gms.tasks.CancellationTokenSource
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import java.text.SimpleDateFormat
 import java.util.Calendar
 import java.util.Date
@@ -108,25 +124,96 @@ class MainActivity : ComponentActivity() {
         var photos by remember { mutableStateOf("") }
         var pendingPhotoPath by remember { mutableStateOf("") }
         var locationPending by remember { mutableStateOf(false) }
+        var selectedPhotoPath by remember { mutableStateOf<String?>(null) }
+
+        // Obtém uma posição atual (não depende apenas de uma localização antiga em cache).
+        fun applyCapturedLocation(location: Location?) {
+            if (location == null) {
+                locationPending = false
+                Toast.makeText(context, "Ainda não foi possível obter uma posição. Tente novamente em local aberto.", Toast.LENGTH_LONG).show()
+                return
+            }
+            lat = String.format(Locale.US, "%.6f", location.latitude)
+            lon = String.format(Locale.US, "%.6f", location.longitude)
+            Toast.makeText(context, "Coordenadas capturadas. Buscando endereço…", Toast.LENGTH_SHORT).show()
+            scope.launch {
+                val resolvedAddress = withContext(Dispatchers.IO) {
+                    try {
+                        val geocoder = Geocoder(context, Locale("pt", "BR"))
+                        @Suppress("DEPRECATION")
+                        geocoder.getFromLocation(location.latitude, location.longitude, 1)
+                            ?.firstOrNull()?.getAddressLine(0)
+                    } catch (_: Exception) {
+                        null
+                    }
+                }
+                if (!resolvedAddress.isNullOrBlank()) {
+                    // O campo permanece editável para correções feitas pelo fiscal.
+                    address = resolvedAddress
+                    Toast.makeText(context, "GPS e endereço preenchidos. Você pode corrigir o endereço.", Toast.LENGTH_LONG).show()
+                } else {
+                    Toast.makeText(context, "GPS capturado, mas o endereço automático não foi localizado. Você pode preenchê-lo manualmente.", Toast.LENGTH_LONG).show()
+                }
+                locationPending = false
+            }
+        }
+
+
+        fun fetchCurrentLocation() {
+            val fine = ContextCompat.checkSelfPermission(this@MainActivity, Manifest.permission.ACCESS_FINE_LOCATION) == PackageManager.PERMISSION_GRANTED
+            val coarse = ContextCompat.checkSelfPermission(this@MainActivity, Manifest.permission.ACCESS_COARSE_LOCATION) == PackageManager.PERMISSION_GRANTED
+            if (!fine && !coarse) {
+                locationPending = false
+                Toast.makeText(context, "Permita o acesso à localização para capturar o GPS.", Toast.LENGTH_LONG).show()
+                return
+            }
+
+            locationPending = true
+            val client = LocationServices.getFusedLocationProviderClient(this@MainActivity)
+            val token = CancellationTokenSource()
+            try {
+                client.getCurrentLocation(Priority.PRIORITY_HIGH_ACCURACY, token.token)
+                    .addOnSuccessListener { current ->
+                        if (current != null) {
+                            applyCapturedLocation(current)
+                        } else {
+                            client.lastLocation
+                                .addOnSuccessListener { last -> applyCapturedLocation(last) }
+                                .addOnFailureListener {
+                                    locationPending = false
+                                    Toast.makeText(context, "Não foi possível obter a localização. Confira o GPS e tente novamente em local aberto.", Toast.LENGTH_LONG).show()
+                                }
+                        }
+                    }
+                    .addOnFailureListener {
+                        client.lastLocation
+                            .addOnSuccessListener { last -> applyCapturedLocation(last) }
+                            .addOnFailureListener {
+                                locationPending = false
+                                Toast.makeText(context, "Falha ao obter a localização. Confira o GPS e tente novamente.", Toast.LENGTH_LONG).show()
+                            }
+                    }
+            } catch (_: SecurityException) {
+                locationPending = false
+                Toast.makeText(context, "Sem permissão de localização. Confira as permissões do aplicativo.", Toast.LENGTH_LONG).show()
+            }
+        }
+
+        val locationPermission = rememberLauncherForActivityResult(ActivityResultContracts.RequestMultiplePermissions()) { result ->
+            val granted = result[Manifest.permission.ACCESS_FINE_LOCATION] == true || result[Manifest.permission.ACCESS_COARSE_LOCATION] == true
+            if (granted) fetchCurrentLocation()
+            else {
+                locationPending = false
+                Toast.makeText(context, "Permissão de localização negada. Ative-a nas configurações do aplicativo.", Toast.LENGTH_LONG).show()
+            }
+        }
+
         val photoCapture = rememberLauncherForActivityResult(ActivityResultContracts.TakePicture()) { success ->
             if (success && pendingPhotoPath.isNotBlank()) {
                 photos = (photos.split("\n").filter { it.isNotBlank() } + pendingPhotoPath).joinToString("\n")
                 Toast.makeText(context, "Foto adicionada à ocorrência", Toast.LENGTH_SHORT).show()
             }
             pendingPhotoPath = ""
-        }
-        val locationPermission = rememberLauncherForActivityResult(ActivityResultContracts.RequestMultiplePermissions()) { result ->
-            if (result.values.any { it }) {
-                val lm = getSystemService(LOCATION_SERVICE) as LocationManager
-                val loc: Location? = try {
-                    if (ContextCompat.checkSelfPermission(this@MainActivity, Manifest.permission.ACCESS_FINE_LOCATION) == PackageManager.PERMISSION_GRANTED)
-                        lm.getLastKnownLocation(LocationManager.GPS_PROVIDER) ?: lm.getLastKnownLocation(LocationManager.NETWORK_PROVIDER)
-                    else lm.getLastKnownLocation(LocationManager.NETWORK_PROVIDER)
-                } catch (_: SecurityException) { null }
-                if (loc != null) { lat = loc.latitude.toString(); lon = loc.longitude.toString() }
-                else Toast.makeText(context, "Localização indisponível. Verifique o GPS e tente novamente.", Toast.LENGTH_LONG).show()
-            }
-            locationPending = false
         }
         LaunchedEffect(Unit) { db.occurrenceDao().observeAll().collectLatest { occurrences = it } }
         Scaffold(topBar = { TopAppBar(title = { Text("BANZO VISTORIA") }) }) { padding ->
@@ -140,16 +227,13 @@ class MainActivity : ComponentActivity() {
                     OutlinedTextField(lon, { lon = it }, label = { Text("Longitude") }, modifier = Modifier.weight(1f))
                 } }
                 item { Button(onClick = {
-                    locationPending = true
                     val fine = ContextCompat.checkSelfPermission(this@MainActivity, Manifest.permission.ACCESS_FINE_LOCATION) == PackageManager.PERMISSION_GRANTED
                     val coarse = ContextCompat.checkSelfPermission(this@MainActivity, Manifest.permission.ACCESS_COARSE_LOCATION) == PackageManager.PERMISSION_GRANTED
-                    if (fine || coarse) {
-                        val lm = getSystemService(LOCATION_SERVICE) as LocationManager
-                        val loc = try { lm.getLastKnownLocation(if (fine) LocationManager.GPS_PROVIDER else LocationManager.NETWORK_PROVIDER) } catch (_: Exception) { null }
-                        if (loc != null) { lat = loc.latitude.toString(); lon = loc.longitude.toString() } else Toast.makeText(context, "Sem posição recente. Ative o GPS e tente novamente.", Toast.LENGTH_LONG).show()
-                        locationPending = false
-                    } else locationPermission.launch(arrayOf(Manifest.permission.ACCESS_FINE_LOCATION, Manifest.permission.ACCESS_COARSE_LOCATION))
-                }, modifier = Modifier.fillMaxWidth()) { Text("Capturar coordenadas GPS") } }
+                    if (fine || coarse) fetchCurrentLocation()
+                    else locationPermission.launch(arrayOf(Manifest.permission.ACCESS_FINE_LOCATION, Manifest.permission.ACCESS_COARSE_LOCATION))
+                }, enabled = !locationPending, modifier = Modifier.fillMaxWidth()) {
+                    Text(if (locationPending) "Obtendo localização…" else "Capturar coordenadas GPS e endereço")
+                } }
                 item { ExposedDropdownMenuBox(expanded = expanded, onExpandedChange = { expanded = !expanded }) {
                     OutlinedTextField(value = pathology, onValueChange = {}, readOnly = true, label = { Text("Patologia") }, trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded) }, modifier = Modifier.menuAnchor().fillMaxWidth())
                     ExposedDropdownMenu(expanded = expanded, onDismissRequest = { expanded = false }) {
@@ -159,7 +243,40 @@ class MainActivity : ComponentActivity() {
                 if (pathology == "Outra — especificar") item { OutlinedTextField(other, { other = it }, label = { Text("Especifique a patologia") }, modifier = Modifier.fillMaxWidth()) }
                 item { OutlinedTextField(description, { description = it }, label = { Text("Descrição / providência solicitada") }, minLines = 3, modifier = Modifier.fillMaxWidth()) }
                 item {
-                    Text("Fotografias: ${photos.split("\n").count { it.isNotBlank() }}")
+                    val photoPaths = photos.split("\n").filter { it.isNotBlank() }
+                    Text("Fotografias: ${photoPaths.size}")
+                    if (photoPaths.isNotEmpty()) {
+                        Row(
+                            modifier = Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()),
+                            horizontalArrangement = Arrangement.spacedBy(10.dp)
+                        ) {
+                            photoPaths.forEachIndexed { index, path ->
+                                val thumbnail = remember(path) {
+                                    val bounds = BitmapFactory.Options().apply { inJustDecodeBounds = true }
+                                    BitmapFactory.decodeFile(path, bounds)
+                                    var sample = 1
+                                    while (bounds.outWidth / sample > 320 || bounds.outHeight / sample > 320) sample *= 2
+                                    BitmapFactory.decodeFile(path, BitmapFactory.Options().apply { inSampleSize = sample })?.asImageBitmap()
+                                }
+                                Column(horizontalAlignment = androidx.compose.ui.Alignment.CenterHorizontally) {
+                                    if (thumbnail != null) {
+                                        Image(
+                                            bitmap = thumbnail,
+                                            contentDescription = "Miniatura da fotografia ${index + 1}",
+                                            modifier = Modifier.size(96.dp)
+                                                .border(1.dp, MaterialTheme.colorScheme.outline, RoundedCornerShape(8.dp))
+                                                .background(MaterialTheme.colorScheme.surface, RoundedCornerShape(8.dp))
+                                                .padding(2.dp),
+                                            contentScale = ContentScale.Crop
+                                        )
+                                    } else {
+                                        Text("Foto ${index + 1}\nindisponível", modifier = Modifier.size(96.dp).padding(8.dp))
+                                    }
+                                    Text("Foto ${index + 1}", style = MaterialTheme.typography.labelMedium)
+                                }
+                            }
+                        }
+                    }
                     Button(onClick = {
                         val dir = File(getExternalFilesDir("photos") ?: filesDir, "occurrences")
                         dir.mkdirs()
