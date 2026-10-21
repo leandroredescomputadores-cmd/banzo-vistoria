@@ -1,0 +1,12 @@
+# Banzo Vistoria 0.4.4 — Atualização consolidada
+
+Este ZIP segue o mesmo formato do pacote 0.4.3: a pasta do projeto contém o arquivo `ATUALIZAR_BANZO.bat`.
+
+## Como usar
+1. Extraia a pasta `banzo-vistoria-main` para um local fácil de encontrar.
+2. Execute `ATUALIZAR_BANZO.bat` dentro dessa pasta.
+3. Informe o caminho completo do repositório local existente (a pasta que contém `app`).
+4. Leia os caminhos de origem, destino e backup exibidos e confirme com `S`.
+5. Verifique o GitHub Desktop; se não houver alterações, não faça commit e envie o log mostrado pelo script.
+
+O script faz backup antes de copiar, não copia `.git` e não sobrescreve o atualizador no repositório de destino. A compilação e os testes em aparelho devem ser confirmados separadamente.

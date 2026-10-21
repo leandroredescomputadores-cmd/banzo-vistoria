@@ -1,11 +1,14 @@
 package br.com.banzo.fiscalasfalto.util
 
 import android.content.Context
+import android.graphics.Bitmap
 import android.graphics.BitmapFactory
 import android.graphics.Paint
 import android.graphics.Rect
 import android.graphics.pdf.PdfDocument
 import br.com.banzo.fiscalasfalto.data.Occurrence
+import java.io.ByteArrayInputStream
+import java.io.ByteArrayOutputStream
 import java.io.File
 import java.io.FileOutputStream
 import java.text.SimpleDateFormat
@@ -62,7 +65,7 @@ object PdfReport {
                 canvas.drawText(line.take(100), margin, y, paint); y += 14f
             }
             item.photoPaths.split("\n").filter { it.isNotBlank() }.take(3).forEach { path ->
-                val bitmap = BitmapFactory.decodeFile(path)
+                val bitmap = decodeOptimizedPhoto(path)
                 if (bitmap != null) {
                     if (y > 610f) newPage()
                     val maxW = 155f; val maxH = 105f
@@ -81,5 +84,36 @@ object PdfReport {
         FileOutputStream(output).use { pdf.writeTo(it) }
         pdf.close()
         return output
+    }
+
+    /** Redimensiona e comprime uma cópia para o PDF; o arquivo original não é alterado. */
+    private fun decodeOptimizedPhoto(path: String): Bitmap? {
+        return try {
+            val bounds = BitmapFactory.Options().apply { inJustDecodeBounds = true }
+            BitmapFactory.decodeFile(path, bounds)
+            if (bounds.outWidth <= 0 || bounds.outHeight <= 0) return null
+
+            val maxSide = 1800
+            var sample = 1
+            while (bounds.outWidth / (sample * 2) >= maxSide || bounds.outHeight / (sample * 2) >= maxSide) {
+                sample *= 2
+            }
+            val decoded = BitmapFactory.decodeFile(path, BitmapFactory.Options().apply { inSampleSize = sample })
+                ?: return null
+            val scaled = if (maxOf(decoded.width, decoded.height) > maxSide) {
+                val ratio = maxSide.toFloat() / maxOf(decoded.width, decoded.height)
+                Bitmap.createScaledBitmap(decoded, (decoded.width * ratio).toInt().coerceAtLeast(1), (decoded.height * ratio).toInt().coerceAtLeast(1), true)
+            } else decoded
+            if (scaled !== decoded) decoded.recycle()
+
+            val bytes = ByteArrayOutputStream()
+            scaled.compress(Bitmap.CompressFormat.JPEG, 82, bytes)
+            val optimized = BitmapFactory.decodeStream(ByteArrayInputStream(bytes.toByteArray()))
+            scaled.recycle()
+            optimized
+        } catch (_: Exception) {
+            // Em caso de falha na otimização, tenta abrir a foto original como alternativa.
+            BitmapFactory.decodeFile(path)
+        }
     }
 }

@@ -530,7 +530,6 @@ class MainActivity : ComponentActivity() {
                     if (formStep == 0) {
                         item { SectionIntro("01", "Identificação da vistoria", "Informe quem realizou a fiscalização e onde a ocorrência foi identificada.") }
                         item { OutlinedTextField(inspector, { inspector = it }, label = { Text("Fiscal responsável *") }, modifier = Modifier.fillMaxWidth(), singleLine = true) }
-                        item { OutlinedTextField(address, { address = it }, label = { Text("Endereço *") }, modifier = Modifier.fillMaxWidth()) }
                         item { OutlinedTextField(reference, { reference = it }, label = { Text("Ponto de referência") }, modifier = Modifier.fillMaxWidth()) }
                         item { OutlinedTextField(workOrder, { workOrder = it }, label = { Text("Número da ordem de serviço") }, modifier = Modifier.fillMaxWidth(), singleLine = true) }
                     }
@@ -594,9 +593,12 @@ class MainActivity : ComponentActivity() {
                         modifier = Modifier.fillMaxWidth().heightIn(min = 190.dp, max = 190.dp),
                         factory = { viewContext ->
                             WebView(viewContext).apply {
-                                settings.javaScriptEnabled = false
-                                settings.domStorageEnabled = false
+                                settings.javaScriptEnabled = true
+                                settings.domStorageEnabled = true
                                 settings.loadsImagesAutomatically = true
+                                settings.useWideViewPort = true
+                                settings.loadWithOverviewMode = true
+                                setBackgroundColor(android.graphics.Color.WHITE)
                                 webViewClient = WebViewClient()
                                 val left = longitude - 0.0025
                                 val right = longitude + 0.0025
