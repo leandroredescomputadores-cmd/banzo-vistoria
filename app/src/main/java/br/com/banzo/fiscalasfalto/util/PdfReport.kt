@@ -13,6 +13,8 @@ import java.util.Date
 import java.util.Locale
 
 object PdfReport {
+    fun createSingle(context: Context, item: Occurrence): File = createDaily(context, listOf(item), Date())
+
     fun createDaily(context: Context, items: List<Occurrence>, date: Date = Date()): File {
         val pdf = PdfDocument()
         val pageWidth = 595

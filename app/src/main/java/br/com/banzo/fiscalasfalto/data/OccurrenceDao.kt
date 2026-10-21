@@ -17,6 +17,9 @@ interface OccurrenceDao {
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun upsert(item: Occurrence)
 
+    @Query("DELETE FROM occurrences WHERE id = :id")
+    suspend fun deleteById(id: String)
+
     @Query("UPDATE occurrences SET synced = 1 WHERE id = :id")
     suspend fun markSynced(id: String)
 

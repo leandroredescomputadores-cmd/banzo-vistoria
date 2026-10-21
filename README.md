@@ -50,3 +50,10 @@ A logo e as referências visuais estão em `app/src/main/res/drawable-nodpi/`.
 A imagem de conceito das telas está em `assets/banzo_vistoria_telas_conceito.png`.
 
 **Nota:** a imagem é um mockup conceitual, não uma captura do aplicativo executando. O código continua precisando de compilação e teste; o fluxo de build em nuvem está em `.github/workflows/android.yml`. A integração real com Microsoft Graph/OneDrive e a validação funcional permanecem pendentes.
+
+
+## Atualização 0.4.0
+
+Esta atualização acrescenta navegação entre painel inicial, cadastro/edição, gerenciamento de ocorrências e central de relatórios PDF. A exclusão de ocorrência e de PDF pede confirmação; excluir um PDF não apaga a ocorrência. Os dados continuam no Room local. A sincronização efetiva com OneDrive/Microsoft Graph ainda depende de configuração e implementação de autenticação e envio; o agendamento WorkManager, sozinho, não significa que a sincronização esteja ativa.
+
+Para aplicar no Windows, extraia este pacote e execute `ATUALIZAR_BANZO.bat`. O script cria um backup fora da pasta do repositório, preserva `.git` e registra os logs em `%TEMP%`. Depois, revise as alterações no GitHub Desktop e envie para `main`; aguarde o workflow de compilação antes de instalar o APK.
