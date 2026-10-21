@@ -1,14 +1,3 @@
-## Atualização visual 0.4.1
-
-- Identidade visual mais consistente para uso profissional em campo.
-- Cabeçalho carvão com marca Banzo e assinatura de fiscalização técnica.
-- Painel com cartões de indicadores, atalhos de navegação e estado vazio orientativo.
-- Formulário organizado por etapas: identificação, localização, avaliação técnica, evidências e encaminhamento.
-- Cantos, espaçamentos e superfícies padronizados nas telas.
-- Mantidas as funções existentes de cadastro, edição, exclusão, GPS, fotografias e relatórios PDF.
-
-> A compilação final deve ser confirmada pelo workflow Android do GitHub Actions após a atualização.
-
 # Fiscal Asfalto — MVP Android
 
 Projeto inicial Kotlin + Jetpack Compose para fiscalização de recomposição asfáltica.
@@ -61,22 +50,3 @@ A logo e as referências visuais estão em `app/src/main/res/drawable-nodpi/`.
 A imagem de conceito das telas está em `assets/banzo_vistoria_telas_conceito.png`.
 
 **Nota:** a imagem é um mockup conceitual, não uma captura do aplicativo executando. O código continua precisando de compilação e teste; o fluxo de build em nuvem está em `.github/workflows/android.yml`. A integração real com Microsoft Graph/OneDrive e a validação funcional permanecem pendentes.
-
-
-## Atualização 0.4.1
-
-Esta atualização acrescenta navegação entre painel inicial, cadastro/edição, gerenciamento de ocorrências e central de relatórios PDF. A exclusão de ocorrência e de PDF pede confirmação; excluir um PDF não apaga a ocorrência. Os dados continuam no Room local. A sincronização efetiva com OneDrive/Microsoft Graph ainda depende de configuração e implementação de autenticação e envio; o agendamento WorkManager, sozinho, não significa que a sincronização esteja ativa.
-
-Para aplicar no Windows, extraia este pacote e execute `ATUALIZAR_BANZO.bat`. O script cria um backup fora da pasta do repositório, preserva `.git` e registra os logs em `%TEMP%`. Depois, revise as alterações no GitHub Desktop e envie para `main`; aguarde o workflow de compilação antes de instalar o APK.
-
-
-## Atualização de interface 0.4.2
-
-Esta versão organiza a experiência em quatro etapas de vistoria (identificação, localização, avaliação técnica e evidências), adiciona navegação inferior para Início, Ocorrências, Relatórios e Ajustes, e inclui uma ficha de detalhes da ocorrência. O banco Room existente e os campos atuais da ocorrência são mantidos.
-
-A interface é uma implementação Android nativa em Jetpack Compose inspirada no conceito visual de `assets/banzo_vistoria_telas_conceito.png`. A tela de localização usa o GPS e geocodificação do aparelho; não há mapa cartográfico embutido nesta versão. A sincronização real com OneDrive ainda depende da configuração do Microsoft Graph.
-
-
-## Versão 0.4.3 — miniatura de mapa
-
-A etapa de localização e a ficha de vistoria exibem uma prévia de mapa OpenStreetMap centrada nas coordenadas registradas. O botão abre a posição no Google Maps. A miniatura depende de conexão com a internet; o cadastro e as coordenadas continuam armazenados localmente. Não é necessário configurar chave de API do Google Maps para esta miniatura.
