@@ -94,7 +94,6 @@ object PdfReport {
             paragraph("Status", item.status)
             paragraph("Fiscal responsável", item.inspector)
             paragraph("Endereço", item.address)
-            paragraph("Ponto de referência", item.reference)
             paragraph("Ordem de serviço", item.workOrderNumber)
             paragraph("Coordenadas", "${item.latitude?.toString() ?: "—"}, ${item.longitude?.toString() ?: "—"}")
             paragraph("Descrição técnica / providência", listOf(if (item.pathology == "Outra — especificar") item.pathologyOther else item.pathology, item.description).filter { it.isNotBlank() }.joinToString(" — "))
@@ -114,9 +113,28 @@ object PdfReport {
                         if (optimized != null) {
                             ensureSpace(minOf(optimized.height.toFloat(), 225f) + 27f)
                             canvas.drawText("Evidência fotográfica ${photoIndex + 1}", LEFT, y, small); y += 8f
-                            val h = minOf(220f, optimized.height.toFloat())
-                            canvas.drawBitmap(optimized, null, RectF(LEFT, y, LEFT + optimized.width * (h / optimized.height), y + h), null)
-                            y += h + 14f
+                            // Todas as evidências usam um quadro de dimensões padronizadas;
+                            // a proporção original é preservada e não há corte da fotografia.
+                            val frameWidth = 430f
+                            val frameHeight = 190f
+                            ensureSpace(frameHeight + 27f)
+                            val frame = RectF(LEFT, y, LEFT + frameWidth, y + frameHeight)
+                            val framePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+                                color = android.graphics.Color.rgb(246, 244, 241)
+                                style = Paint.Style.FILL
+                            }
+                            canvas.drawRoundRect(frame, 4f, 4f, framePaint)
+                            val scale = minOf(frameWidth / optimized.width, frameHeight / optimized.height)
+                            val drawWidth = optimized.width * scale
+                            val drawHeight = optimized.height * scale
+                            val dest = RectF(
+                                frame.left + (frameWidth - drawWidth) / 2f,
+                                frame.top + (frameHeight - drawHeight) / 2f,
+                                frame.left + (frameWidth + drawWidth) / 2f,
+                                frame.top + (frameHeight + drawHeight) / 2f
+                            )
+                            canvas.drawBitmap(optimized, null, dest, Paint(Paint.ANTI_ALIAS_FLAG or Paint.FILTER_BITMAP_FLAG))
+                            y += frameHeight + 14f
                             optimized.recycle()
                         }
                         if (scaled !== original) scaled.recycle()

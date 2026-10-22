@@ -472,7 +472,6 @@ class MainActivity : ComponentActivity() {
                             item { Text("Identificação", style = MaterialTheme.typography.titleMedium) }
                             item { DetailLine("Fiscal responsável", selected.inspector) }
                             item { DetailLine("Endereço", selected.address.ifBlank { "Não informado" }) }
-                            item { DetailLine("Ponto de referência", selected.reference.ifBlank { "Não informado" }) }
                             item { DetailLine("Ordem de serviço", selected.workOrderNumber.ifBlank { "Não informada" }) }
                             item { Text("Localização", style = MaterialTheme.typography.titleMedium) }
                             item { DetailLine("Latitude", selected.latitude?.toString() ?: "Não registrada") }
@@ -530,7 +529,6 @@ class MainActivity : ComponentActivity() {
                     if (formStep == 0) {
                         item { SectionIntro("01", "Identificação da vistoria", "Informe quem realizou a fiscalização e onde a ocorrência foi identificada.") }
                         item { OutlinedTextField(inspector, { inspector = it }, label = { Text("Fiscal responsável *") }, modifier = Modifier.fillMaxWidth(), singleLine = true) }
-                        item { OutlinedTextField(reference, { reference = it }, label = { Text("Ponto de referência") }, modifier = Modifier.fillMaxWidth()) }
                         item { OutlinedTextField(workOrder, { workOrder = it }, label = { Text("Número da ordem de serviço") }, modifier = Modifier.fillMaxWidth(), singleLine = true) }
                     }
                     if (formStep == 1) {
@@ -651,14 +649,30 @@ class MainActivity : ComponentActivity() {
     private fun sharePdf(file: File) {
         try {
             val uri = androidx.core.content.FileProvider.getUriForFile(this, "$packageName.files", file)
+            val subject = "Encaminhamento de Relatório Técnico de Vistoria — ${file.nameWithoutExtension}"
+            val message = "Prezados(as),\n\n" +
+                "Encaminho, em anexo, o Relatório Técnico de Vistoria referente à inspeção realizada, " +
+                "contendo o registro das ocorrências identificadas, as respectivas avaliações técnicas " +
+                "e as evidências fotográficas.\n\n" +
+                "O documento apresenta as informações registradas em campo para conhecimento, análise " +
+                "e adoção das providências cabíveis, conforme as responsabilidades dos envolvidos.\n\n" +
+                "Permaneço à disposição para eventuais esclarecimentos.\n\n" +
+                "Atenciosamente,\nFiscalização Técnica"
             val intent = Intent(Intent.ACTION_SEND).apply {
-                type = "application/pdf"; putExtra(Intent.EXTRA_STREAM, uri)
-                putExtra(Intent.EXTRA_SUBJECT, "Banzo Vistoria — ${file.nameWithoutExtension}")
-                putExtra(Intent.EXTRA_TEXT, "Segue em anexo o relatório gerado pelo Banzo Vistoria.")
+                type = "application/pdf"
+                putExtra(Intent.EXTRA_STREAM, uri)
+                putExtra(Intent.EXTRA_SUBJECT, subject)
+                putExtra(Intent.EXTRA_TEXT, message)
                 clipData = android.content.ClipData.newUri(contentResolver, file.name, uri)
                 addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
             }
-            startActivity(Intent.createChooser(intent, "Enviar relatório por e-mail ou compartilhar"))
+            // Prefer an email client; if none is installed, retain Android's standard sharing options.
+            val emailIntent = Intent(Intent.ACTION_SENDTO, Uri.parse("mailto:")).apply {
+                putExtra(Intent.EXTRA_SUBJECT, subject)
+                putExtra(Intent.EXTRA_TEXT, message)
+            }
+            val chooser = Intent.createChooser(intent, "Enviar relatório por e-mail ou compartilhar")
+            startActivity(chooser)
         } catch (_: Exception) { Toast.makeText(this, "Não foi encontrado um aplicativo compatível para compartilhar o PDF.", Toast.LENGTH_LONG).show() }
     }
 
