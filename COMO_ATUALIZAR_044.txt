@@ -1,0 +1,10 @@
+BANZO VISTORIA 0.4.4
+
+1. Extraia este ZIP para uma pasta temporaria.
+2. Execute ATUALIZAR_BANZO.bat.
+3. Informe a pasta raiz do repositorio local (aquela que contem .git).
+4. Digite SIM para confirmar.
+5. Confira as alteracoes no GitHub Desktop, faca commit e Push origin.
+6. Aguarde o GitHub Actions concluir e verifique o APK gerado.
+
+O script cria backup antes de copiar. A compilacao e os testes no aparelho ainda precisam ser realizados.

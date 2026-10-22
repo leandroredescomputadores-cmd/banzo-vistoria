@@ -567,7 +567,7 @@ class MainActivity : ComponentActivity() {
                     item {
                         Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
                             if (formStep > 0) androidx.compose.material3.OutlinedButton(onClick = { formStep -= 1 }, modifier = Modifier.weight(1f)) { Text("Voltar") }
-                            if (formStep < 3) Button(onClick = { if (formStep == 0 && (inspector.isBlank() || address.isBlank())) Toast.makeText(context, "Informe o fiscal e o endereço para continuar.", Toast.LENGTH_SHORT).show() else if (formStep == 2 && description.isBlank()) Toast.makeText(context, "Inclua a descrição técnica para continuar.", Toast.LENGTH_SHORT).show() else formStep += 1 }, modifier = Modifier.weight(1f)) { Text("Próximo  →") }
+                            if (formStep < 3) Button(onClick = { if (formStep == 0 && inspector.isBlank()) Toast.makeText(context, "Informe o fiscal responsável para continuar.", Toast.LENGTH_SHORT).show() else if (formStep == 1 && address.isBlank()) Toast.makeText(context, "Informe ou capture o endereço na etapa Localização.", Toast.LENGTH_SHORT).show() else if (formStep == 2 && description.isBlank()) Toast.makeText(context, "Inclua a descrição técnica para continuar.", Toast.LENGTH_SHORT).show() else formStep += 1 }, modifier = Modifier.weight(1f)) { Text("Próximo  →") }
                         }
                     }
                 }
@@ -596,9 +596,6 @@ class MainActivity : ComponentActivity() {
                                 settings.javaScriptEnabled = true
                                 settings.domStorageEnabled = true
                                 settings.loadsImagesAutomatically = true
-                                settings.useWideViewPort = true
-                                settings.loadWithOverviewMode = true
-                                setBackgroundColor(android.graphics.Color.WHITE)
                                 webViewClient = WebViewClient()
                                 val left = longitude - 0.0025
                                 val right = longitude + 0.0025
